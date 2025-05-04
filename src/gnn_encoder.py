@@ -7,15 +7,6 @@ def collate_fn_gnn(batch):
     """
     Custom function that defines how batches are formed.
 
-    For a more complicated dataset with variable length per event and Graph Neural Networks,
-    we need to define a custom collate function which is passed to the DataLoader.
-    The default collate function in PyTorch Geometric is not suitable for this case.
-
-    This function takes the Awkward arrays, converts them to PyTorch tensors,
-    and then creates a PyTorch Geometric Data object for each event in the batch.
-
-    You do not need to change this function.
-
     Parameters
     ----------
     batch : list
@@ -32,22 +23,18 @@ def collate_fn_gnn(batch):
     labels = []
 
     for b in batch:
-        # this is a loop over each event within the batch
+        # loop over each event within the batch
         # b["data"] is the first entry in the batch with dimensions (n_features, n_hits)
         # where the feautures are (time, x, y)
-        # for training a GNN, we need the graph notes, i.e., the individual hits, as the first dimension,
-        # so we need to transpose to get (n_hits, n_features)
         tensordata = torch.from_numpy(b["data"].to_numpy()).T
-        # the original data is in double precision (float64), for our case single precision is sufficient
-        # we let's convert to single precision (float32) to save memory and computation time
+        # single precision (float32) to save memory and computation time
         tensordata = tensordata.to(dtype=torch.float32)
 
-        # PyTorch Geometric needs the data in a specific format
-        # we need to create a PyTorch Geometric Data object for each event
+        # Geometric Data object for each event
         this_graph_item = Data(x=tensordata)
         data_list.append(this_graph_item)
 
-        # also the labels need to be packaged as pytorch tensors
+        # labels need to be packaged as pytorch tensors
         labels.append(torch.Tensor([b["xpos"], b["ypos"]]).unsqueeze(0))
 
     labels = torch.cat(labels, dim=0) # convert the list of tensors to a single tensor
@@ -91,9 +78,6 @@ class GNNEncoder(nn.Module):
         for layer in self.layer_list:
             x = layer(x, batch) 
 
-        # the output of the last layer has dimensions (n_batch, n_nodes, hidden_channels)
-        # where n_batch is the number of graphs in the batch and n_nodes is the number of nodes in the graph
-        # i.e. one output per node (i.e. the hits in the event).
         # combine all node feauters into single prediction
         x = global_mean_pool(x, batch) # -> (n_batch, hidden_channels)
         # map to two output labels (xpos, ypos)
